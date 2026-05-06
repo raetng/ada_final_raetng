@@ -1,0 +1,13 @@
+Location,Location Type,representative_city,latitude,longitude,notes
+LZ_AEN,Load Zone,"Abilene, TX",32.4487,-99.7331,AEP Texas North service area
+LZ_CPS,Load Zone,"San Antonio, TX",29.4241,-98.4936,CPS Energy service area
+LZ_HOUSTON,Load Zone,"Houston, TX",29.7604,-95.3698,Houston metro load zone
+LZ_LCRA,Load Zone,"Austin, TX",30.2672,-97.7431,Lower Colorado River Authority (central TX)
+LZ_NORTH,Load Zone,"Dallas, TX",32.7767,-96.797,North Texas (DFW) load zone
+LZ_SOUTH,Load Zone,"Corpus Christi, TX",27.8006,-97.3964,South Texas load zone
+HB_BUSAVG,Trading Hub,"College Station, TX",30.628,-96.3344,Bus-level system average — ERCOT centroid proxy
+HB_HOUSTON,Trading Hub,"Houston, TX",29.7604,-95.3698,Houston trading hub
+HB_HUBAVG,Trading Hub,"College Station, TX",30.628,-96.3344,Avg of 4 geographic hubs — ERCOT centroid proxy
+HB_NORTH,Trading Hub,"Dallas, TX",32.7767,-96.797,North (DFW) trading hub
+HB_PAN,Trading Hub,"Amarillo, TX",35.222,-101.8313,Panhandle trading hub
+HB_SOUTH,Trading Hub,"Corpus Christi, TX",27.8006,-97.3964,South trading hub
