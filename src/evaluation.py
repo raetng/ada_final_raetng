@@ -18,8 +18,11 @@ from sklearn.metrics import (
     brier_score_loss,
     confusion_matrix,
     f1_score,
+    mean_absolute_error,
+    mean_squared_error,
     precision_recall_curve,
     precision_score,
+    r2_score,
     recall_score,
     roc_auc_score,
     roc_curve,
@@ -42,6 +45,28 @@ def make_time_series_splits(df, n_splits=5):
         )
     tscv = TimeSeriesSplit(n_splits=n_splits)
     return list(tscv.split(np.arange(len(df))))
+
+
+def make_time_series_splits_grouped(df, group_col="datetime", n_splits=5):
+    """Time-series CV where fold boundaries respect timestamp groups.
+
+    Needed for the multi-hub modeling matrix: each timestamp contributes one
+    row per hub, and HB_* hubs co-spike with correlation >0.998. A naive
+    row-index split would put hub A at time T in train and hub B at time T
+    in test — same weather, same gas, near-identical target — which inflates
+    test performance. This splitter assigns whole timestamps to train or test.
+    """
+    if not df[group_col].is_monotonic_increasing:
+        raise ValueError(f"df must be sorted ascending by '{group_col}'.")
+    groups = df.groupby(group_col, sort=False).indices
+    timestamps = list(groups.keys())
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    splits = []
+    for train_ts_idx, test_ts_idx in tscv.split(timestamps):
+        train_rows = np.concatenate([groups[timestamps[i]] for i in train_ts_idx])
+        test_rows = np.concatenate([groups[timestamps[i]] for i in test_ts_idx])
+        splits.append((train_rows, test_rows))
+    return splits
 
 
 def evaluate_classifier(y_true, y_proba, threshold=None):
@@ -104,6 +129,56 @@ def evaluate_classifier(y_true, y_proba, threshold=None):
         "recall_at_recall_0.80": recall_at_target_recall,
         "y_true": y_true,
         "y_proba": y_proba,
+    }
+
+
+def evaluate_regressor(y_true_log, y_pred_log):
+    """Score a log-target regressor for stage-2 magnitude prediction.
+
+    Inputs are on the log scale (natural log of SPP). Reports the standard log-
+    scale fit metrics (RMSE, MAE, R^2) plus back-transformed dollar metrics so
+    we can sanity-check what the log-scale errors mean for an operator: median
+    absolute dollar error, and median absolute percentage error in dollars.
+    Median is preferred over mean for the dollar-scale metrics because spike
+    magnitudes have an extreme right tail that would let a few hours dominate
+    any mean-based summary.
+    """
+    y_true_log = np.asarray(y_true_log, dtype=float)
+    y_pred_log = np.asarray(y_pred_log, dtype=float)
+
+    rmse_log = float(np.sqrt(mean_squared_error(y_true_log, y_pred_log)))
+    mae_log = float(mean_absolute_error(y_true_log, y_pred_log))
+    r2_log = float(r2_score(y_true_log, y_pred_log))
+
+    y_true_d = np.exp(y_true_log)
+    y_pred_d = np.exp(y_pred_log)
+    abs_err_d = np.abs(y_pred_d - y_true_d)
+    pct_err_d = abs_err_d / y_true_d
+
+    # MAE on the top decile of *actual* spike magnitudes — where the operational
+    # cost of being wrong is highest. Computed in log-space (consistent with
+    # the headline metric) using the 90th percentile of y_true_log as the cut.
+    cutoff = float(np.quantile(y_true_log, 0.90))
+    top = y_true_log >= cutoff
+    if top.any():
+        mae_log_top_decile = float(mean_absolute_error(y_true_log[top], y_pred_log[top]))
+        n_top = int(top.sum())
+    else:
+        mae_log_top_decile = float("nan")
+        n_top = 0
+
+    return {
+        "rmse_log": rmse_log,
+        "mae_log": mae_log,
+        "r2_log": r2_log,
+        "median_abs_err_dollars": float(np.median(abs_err_d)),
+        "median_abs_pct_err": float(np.median(pct_err_d)),
+        "mae_log_top_decile": mae_log_top_decile,
+        "top_decile_cutoff_log": cutoff,
+        "n_top_decile": n_top,
+        "n": int(len(y_true_log)),
+        "y_true_log": y_true_log,
+        "y_pred_log": y_pred_log,
     }
 
 
